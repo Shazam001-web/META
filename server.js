@@ -1,28 +1,23 @@
-require("dotenv").config();
-const express = require("express");
-const fetch = require("node-fetch");
-const path = require("path");
+import express from "express";
+import fetch from "node-fetch";
+import dotenv from "dotenv";
+import path from "path";
+
+dotenv.config();
 
 const app = express();
-
-// 🔴 THIS MUST EXIST
 const PORT = process.env.PORT || 3000;
 
-// Middleware
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static("public"));
 
-// Serve frontend
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
-
-// API route
+// Chat API
 app.post("/api/chat", async (req, res) => {
   try {
-    const { message } = req.body;
-    if (!message) {
-      return res.json({ reply: "No message received." });
+    const userMessage = req.body.message;
+
+    if (!userMessage) {
+      return res.json({ reply: "Please type a message." });
     }
 
     const response = await fetch(
@@ -31,7 +26,11 @@ app.post("/api/chat", async (req, res) => {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: message }] }],
+          contents: [
+            {
+              parts: [{ text: userMessage }],
+            },
+          ],
         }),
       }
     );
@@ -39,17 +38,16 @@ app.post("/api/chat", async (req, res) => {
     const data = await response.json();
 
     const reply =
-      data.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "META X AI is thinking too hard 🤯";
+      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
+      "META X AI could not think of a response 🤯";
 
     res.json({ reply });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ reply: "Server error" });
+    console.error("Server error:", err);
+    res.status(500).json({ reply: "Server error occurred." });
   }
 });
 
-// 🔴 THIS LINE IS CRITICAL
 app.listen(PORT, () => {
-  console.log(`META X AI running on port ${PORT}`);
+  console.log(`✅ Server running on port ${PORT}`);
 });
