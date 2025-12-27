@@ -1,32 +1,41 @@
 import express from "express";
 import fetch from "node-fetch";
-import path from "path";
+import dotenv from "dotenv";
+import cors from "cors";
+
+dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-
+app.use(cors());
 app.use(express.json());
-app.use(express.static("public"));
 
-app.get("/", (req, res) => {
-  res.sendFile(path.resolve("public/index.html"));
-});
+const PORT = process.env.PORT || 10000;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
+if (!GEMINI_API_KEY) {
+  console.error("❌ GEMINI_API_KEY is missing");
+}
 
 app.post("/chat", async (req, res) => {
   try {
     const userMessage = req.body.message;
+
     if (!userMessage) {
-      return res.json({ reply: "Say something 🙂" });
+      return res.status(400).json({ error: "No message provided" });
     }
 
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${process.env.GEMINI_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: userMessage }] }],
-        }),
+          contents: [
+            {
+              parts: [{ text: userMessage }]
+            }
+          ]
+        })
       }
     );
 
@@ -34,12 +43,13 @@ app.post("/chat", async (req, res) => {
 
     const reply =
       data.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "META X AI is thinking too hard 🤯";
+      "No response from AI.";
 
     res.json({ reply });
+
   } catch (err) {
     console.error(err);
-    res.json({ reply: "Server error 😢" });
+    res.status(500).json({ error: "AI server error" });
   }
 });
 
