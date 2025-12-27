@@ -2,18 +2,27 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>META X AI</title>
 
   <style>
     body {
       margin: 0;
-      font-family: Arial, sans-serif;
-      background: #0d0d0d;
-      color: #ffffff;
+      font-family: Arial, Helvetica, sans-serif;
+      background: #0b0b0b;
+      color: #fff;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .app {
+      width: 100%;
+      max-width: 480px;
+      height: 100%;
       display: flex;
       flex-direction: column;
-      height: 100vh;
     }
 
     header {
@@ -21,134 +30,151 @@
       text-align: center;
       font-size: 22px;
       font-weight: bold;
-      background: #000;
       border-bottom: 1px solid #222;
     }
 
-    #chat-box {
+    .chat {
       flex: 1;
       padding: 15px;
       overflow-y: auto;
     }
 
-    .user {
-      background: #1e88e5;
+    .msg {
+      margin-bottom: 12px;
+      max-width: 80%;
       padding: 10px 14px;
       border-radius: 12px;
-      margin: 8px 0;
-      max-width: 80%;
+      line-height: 1.4;
+      word-wrap: break-word;
+    }
+
+    .user {
+      background: #1e88e5;
       align-self: flex-end;
+      border-bottom-right-radius: 4px;
     }
 
     .bot {
-      background: #222;
-      padding: 10px 14px;
-      border-radius: 12px;
-      margin: 8px 0;
-      max-width: 80%;
+      background: #1c1c1c;
       align-self: flex-start;
+      border-bottom-left-radius: 4px;
     }
 
-    #input-area {
+    .typing {
+      font-style: italic;
+      opacity: 0.7;
+    }
+
+    footer {
       display: flex;
       padding: 10px;
-      background: #000;
       border-top: 1px solid #222;
+      gap: 10px;
     }
 
-    #user-input {
+    input {
       flex: 1;
-      padding: 12px;
+      padding: 10px;
       border-radius: 8px;
       border: none;
       outline: none;
-      font-size: 16px;
     }
 
-    #send-btn {
-      margin-left: 10px;
-      padding: 12px 18px;
-      border: none;
+    button {
+      padding: 10px 16px;
       border-radius: 8px;
-      background: #1e88e5;
-      color: #fff;
-      font-size: 16px;
+      border: none;
       cursor: pointer;
-    }
-
-    #send-btn:hover {
-      opacity: 0.9;
+      background: #1e88e5;
+      color: white;
+      font-weight: bold;
     }
   </style>
 </head>
 
 <body>
+  <div class="app">
+    <header>🤖 META X AI</header>
 
-  <header>🤖 META X AI</header>
+    <div id="chat" class="chat">
+      <div class="msg bot">
+        Greetings, human! I'm <b>META X AI</b> 🚀<br>
+        What’s on your mind?
+      </div>
+    </div>
 
-  <div id="chat-box"></div>
-
-  <div id="input-area">
-    <input
-      type="text"
-      id="user-input"
-      placeholder="Ask anything..."
-      autocomplete="off"
-    />
-    <button id="send-btn">Send</button>
+    <footer>
+      <input id="input" type="text" placeholder="Ask anything..." />
+      <button onclick="send()">Send</button>
+    </footer>
   </div>
 
   <script>
-    const chatBox = document.getElementById("chat-box");
-    const input = document.getElementById("user-input");
-    const sendBtn = document.getElementById("send-btn");
+    const chat = document.getElementById("chat");
+    const input = document.getElementById("input");
 
-    function addMessage(text, sender) {
-      const msg = document.createElement("div");
-      msg.className = sender;
-      msg.innerText = text;
-      chatBox.appendChild(msg);
-      chatBox.scrollTop = chatBox.scrollHeight;
+    function addMessage(text, type) {
+      const div = document.createElement("div");
+      div.className = "msg " + type;
+      div.innerText = text;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+      return div;
     }
 
-    sendBtn.onclick = sendMessage;
+    async function send() {
+      const text = input.value.trim();
+      if (!text) return;
 
-    input.addEventListener("keypress", (e) => {
-      if (e.key === "Enter") sendMessage();
-    });
-
-    async function sendMessage() {
-      const message = input.value.trim();
-      if (!message) return;
-
-      addMessage(message, "user");
       input.value = "";
+      addMessage(text, "user");
 
-      const typing = document.createElement("div");
-      typing.className = "bot";
-      typing.innerText = "META X AI is typing...";
-      chatBox.appendChild(typing);
-      chatBox.scrollTop = chatBox.scrollHeight;
+      const typing = addMessage("META X AI is typing...", "bot typing");
 
       try {
         const res = await fetch("/api/chat", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ message }),
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text })
         });
 
         const data = await res.json();
+        typing.remove();
 
-        chatBox.removeChild(typing);
-        addMessage(data.reply, "bot");
+        // 🔥 FIX: Convert raw JSON to clean text
+        const reply =
+          typeof data.reply === "string"
+            ? data.reply
+            : JSON.stringify(data.reply, null, 2);
+
+        typeEffect(reply);
+
       } catch (err) {
-        chatBox.removeChild(typing);
+        typing.remove();
         addMessage("❌ Could not reach META X AI.", "bot");
       }
     }
-  </script>
 
+    function typeEffect(text) {
+      const div = document.createElement("div");
+      div.className = "msg bot";
+      chat.appendChild(div);
+
+      let i = 0;
+      const speed = 25;
+
+      const interval = setInterval(() => {
+        div.innerText += text[i];
+        i++;
+        chat.scrollTop = chat.scrollHeight;
+
+        if (i >= text.length) clearInterval(interval);
+      }, speed);
+    }
+
+    input.addEventListener("keydown", e => {
+      if (e.key === "Enter") send();
+    });
+  </script>
 </body>
-</html>       
+</html>
