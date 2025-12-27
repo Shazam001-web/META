@@ -1,80 +1,46 @@
-require("dotenv").config();
-const express = require("express");
-const cors = require("cors");
-const path = require("path");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
+import express from "express";
+import fetch from "node-fetch";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 const app = express();
-
-// Middleware
-app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static("public"));
 
-// Gemini setup
-if (!process.env.GEMINI_API_KEY) {
-  console.error("❌ GEMINI_API_KEY is missing");
-  process.exit(1);
-}
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-
-// System prompt (FIXED — was broken before)
-const systemPrompt = `
-You are META X AI — a maximally truthful, witty, and helpful AI.
-Be direct, sarcastic when appropriate, concise but complete.
-Never hallucinate facts. Have personality.
-`;
-
-// In-memory chat sessions
-const chatSessions = new Map();
-
-// Chat API
 app.post("/api/chat", async (req, res) => {
-  const { message, sessionId = "default" } = req.body;
-
-  if (!message) {
-    return res.status(400).json({ error: "Message is required" });
-  }
-
   try {
-    let chat = chatSessions.get(sessionId);
+    const userMessage = req.body.message;
 
-    if (!chat) {
-      const model = genAI.getGenerativeModel({
-        model: "gemini-1.5-flash",
-        systemInstruction: systemPrompt,
-      });
-
-      chat = model.startChat();
-      chatSessions.set(sessionId, chat);
+    if (!userMessage) {
+      return res.status(400).json({ error: "No message provided" });
     }
 
-    // Streaming headers
-    res.setHeader("Content-Type", "text/plain; charset=utf-8");
-    res.setHeader("Transfer-Encoding", "chunked");
+    const response = await fetch(
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=" +
+        process.env.GEMINI_API_KEY,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: userMessage }] }],
+        }),
+      }
+    );
 
-    const result = await chat.sendMessageStream(message);
+    const data = await response.json();
+    const reply =
+      data.candidates?.[0]?.content?.parts?.[0]?.text ||
+      "No response from AI.";
 
-    for await (const chunk of result.stream) {
-      const text = chunk.text();
-      if (text) res.write(text);
-    }
-
-    res.end();
+    res.json({ reply });
   } catch (err) {
-    console.error("❌ Gemini error:", err);
-    res.status(500).end("AI error. Check API key or quota.");
+    console.error(err);
+    res.status(500).json({ error: "AI server error" });
   }
 });
 
-// Serve frontend
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
-
-// Render PORT support
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🚀 META X AI running on port ${PORT}`);
-});
+app.listen(PORT, () =>
+  console.log("🚀 META X AI running on port", PORT)
+);
