@@ -1,53 +1,47 @@
-import express from "express";
-import fetch from "node-fetch";
-import dotenv from "dotenv";
-import path from "path";
-
-dotenv.config();
+require("dotenv").config();
+const express = require("express");
+const cors = require("cors");
+const path = require("path");
+const { GoogleGenerativeAI } = require("@google/generative-ai");
 
 const app = express();
-const PORT = process.env.PORT || 3000;
 
+app.use(cors());
 app.use(express.json());
-app.use(express.static("public"));
+app.use(express.static(path.join(__dirname, "public")));
 
-// Chat API
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+
+const systemPrompt = `
+You are META X AI — witty, intelligent, slightly sarcastic, but always helpful.
+Keep answers clear, human, and conversational.
+`;
+
 app.post("/api/chat", async (req, res) => {
   try {
-    const userMessage = req.body.message;
-
-    if (!userMessage) {
-      return res.json({ reply: "Please type a message." });
+    const { message } = req.body;
+    if (!message) {
+      return res.status(400).json({ reply: "Message is empty." });
     }
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${process.env.GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [{ text: userMessage }],
-            },
-          ],
-        }),
-      }
-    );
+    const model = genAI.getGenerativeModel({
+      model: "gemini-1.5-flash",
+      systemInstruction: systemPrompt,
+    });
 
-    const data = await response.json();
-
-    const reply =
-      data?.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "META X AI could not think of a response 🤯";
+    const result = await model.generateContent(message);
+    const reply = result.response.text();
 
     res.json({ reply });
   } catch (err) {
-    console.error("Server error:", err);
-    res.status(500).json({ reply: "Server error occurred." });
+    console.error("AI ERROR:", err);
+    res.status(500).json({
+      reply: "META X AI is thinking too hard 🤯",
+    });
   }
 });
 
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`✅ Server running on port ${PORT}`);
+  console.log(`META X AI running on port ${PORT}`);
 });
